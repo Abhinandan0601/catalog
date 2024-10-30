@@ -1,0 +1,96 @@
+import org.json.JSONObject;
+import org.json.JSONTokener;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+public class ShamirSecretSharing {
+
+  
+    private static List<Point> decodePoints(JSONObject data) {
+        List<Point> points = new ArrayList<>();
+        
+        for (String key : data.keySet()) {
+            if (key.equals("keys")) continue; // Skip the "keys" entry
+            
+            int x = Integer.parseInt(key);  // x is the key in JSON
+            JSONObject pointData = data.getJSONObject(key);
+            int base = pointData.getInt("base");
+            String value = pointData.getString("value");
+            
+            BigInteger y = new BigInteger(value, base);  // Decode y value based on base
+            points.add(new Point(x, y));
+        }
+        return points;
+    }
+
+
+    private static BigInteger lagrangeInterpolation(List<Point> points, int k) {
+        BigInteger constantTerm = BigInteger.ZERO;
+
+        for (int i = 0; i < k; i++) {
+            BigInteger numerator = BigInteger.ONE;
+            BigInteger denominator = BigInteger.ONE;
+
+            for (int j = 0; j < k; j++) {
+                if (i != j) {
+                    int x_i = points.get(i).x;
+                    int x_j = points.get(j).x;
+
+                    numerator = numerator.multiply(BigInteger.valueOf(-x_j)); // (0 - x_j)
+                    denominator = denominator.multiply(BigInteger.valueOf(x_i - x_j));
+                }
+            }
+
+            BigInteger term = points.get(i).y.multiply(numerator).divide(denominator);
+            constantTerm = constantTerm.add(term);
+        }
+
+        return constantTerm;
+    }
+
+
+    public static BigInteger findConstantTerm(String filePath) throws IOException {
+        try (FileInputStream fileInputStream = new FileInputStream(filePath)) {
+            JSONTokener tokener = new JSONTokener(fileInputStream);
+            JSONObject data = new JSONObject(tokener);
+
+            int n = data.getJSONObject("keys").getInt("n");
+            int k = data.getJSONObject("keys").getInt("k");
+
+            List<Point> decodedPoints = decodePoints(data);
+            return lagrangeInterpolation(decodedPoints, k);
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            // Replace with actual file paths for your JSON test cases
+            String filePath1 = "test_case_1.json";
+            String filePath2 = "test_case_2.json";
+
+            BigInteger constant1 = findConstantTerm(filePath1);
+            BigInteger constant2 = findConstantTerm(filePath2);
+
+            System.out.println("Secret (constant term) for Test Case 1: " + constant1);
+            System.out.println("Secret (constant term) for Test Case 2: " + constant2);
+        } catch (IOException e) {
+            System.err.println("Error reading JSON file: " + e.getMessage());
+        }
+    }
+
+  
+    static class Point {
+        int x;
+        BigInteger y;
+
+        Point(int x, BigInteger y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+}
